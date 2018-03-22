@@ -29,6 +29,7 @@ def get_time(line):
         if key == 'back':
             elements.clear_all()
             raise PopGUISection()
+    elements.deselect_all()
     return elements[2].count + elements[1].count * 60 + elements[0].count * 60 ** 2
 
 

@@ -320,6 +320,11 @@ class ElementList(list):
             element.clear()
         self.cleanup()
     
+    def deselect_all(self):
+        for element in self:
+            if element.selected:
+                element.deselect()
+    
     def move_left(self):
         self._current_index = (self._current_index - 1) % len(self)
         current = self.current
