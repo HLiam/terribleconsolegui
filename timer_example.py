@@ -19,11 +19,11 @@ def get_type(line):
 
 def get_time(line):
     #          hh:mm:ss
-    print_pos('  :  :  ', 2, line)
     elements = ElementList(GUICounter(3, line, align='right', padding=2, bounds=(0, 23)),
                            GUICounter(6, line, align='right', padding=2, bounds=(0, 59)),
                            GUICounter(9, line, align='right', padding=2, bounds=(0, 59)),
                            default=2, exclusive=True)
+    elements.init = lambda: print_pos('  :  :  ', 3, line)
     elements.cleanup = lambda: print_pos('        ', 2, line)
     for key in elements.key_presses(auto_left_right=True, auto_up_down=True, auto_esc=True, auto_enter=True):
         if key == 'back':
