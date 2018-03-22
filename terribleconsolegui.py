@@ -111,24 +111,15 @@ class GUIElement:
         self.unsel_back = unsel_back
         self.exclusive_to = []
     
-    def set_sel_fore(self, color):
-        """Set the selected foreground."""
-        self.sel_fore = color
-        self.update()
-    
-    def set_sel_back(self, color):
-        """Set the selected background."""
-        self.sel_back = color
-        self.update()
-    
-    def set_unsel_fore(self, color):
-        """Set the unselected foreground."""
-        self.unsel_fore = color
-        self.update()
-    
-    def set_unsel_back(self, color):
-        """Set the unselected background."""
-        self.unsel_back = color
+    def set_color(self, sel_fore=None, sel_back=None, unsel_fore=None, unsel_back=None):
+        if sel_fore is not None:
+            self.sel_fore = sel_fore
+        if sel_back is not None:
+            self.sel_back = sel_back
+        if unsel_fore is not None:
+            self.unsel_fore = unsel_fore
+        if unsel_back is not None:
+            self.unsel_back = unsel_back
         self.update()
     
     def update(self, text: str=None):
@@ -306,8 +297,9 @@ class ElementList(list):
         return self[self._current_index]
     
     @current.setter
-    def current(self, value):
-        self._current_index = self.index(value)
+    def current(self, element):
+        self._current_index = self.index(element)
+        element.select()
     
     def init(self):
         pass
