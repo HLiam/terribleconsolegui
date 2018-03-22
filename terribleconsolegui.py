@@ -56,13 +56,17 @@ keys.update({bytes((i,)): chr(i) for i in range(32, 127)})
 
 
 def print_pos(text: str, x: int, y: int, fore=Fore.RESET, back=Back.RESET):
-    """Print a string at a specific x adn y of the console."""
+    """Print a colored string at a specific x and y of the console."""
     print(f'\033[{y};{x}H', end=''.join((fore, back, str(text), Fore.RESET, Back.RESET)))
 
 
 class PopGUISection(Exception):
     """This exception should be raised when closing and cleaning up a
-    gui section."""
+    gui section.
+    
+    TODO: This was a temporary solution. Get rid of it and make a stack
+        of layouts that manages everything on its own. It's gunna be so
+        fancy."""
     pass
 
 
@@ -97,6 +101,11 @@ class GUIElement:
         unsel_fore(str): The color of the foreground when unselected.
         unsel_back(str): The color of the background when unselected.
         selected(bool): Whether or not this element is selected.
+        exclusive_to(list): A list of other gui elements that are
+            mutualy exclusive to this element. If this element is
+            selected is selected, all the elements in this list will be
+            deselected. If the list contains this element, it will be
+            skiped.
     """
     
     def __init__(self, text, x, y, sel_fore=Fore.RESET, sel_back=Back.GREEN,
@@ -112,6 +121,14 @@ class GUIElement:
         self.exclusive_to = []
     
     def set_color(self, sel_fore=None, sel_back=None, unsel_fore=None, unsel_back=None):
+        """Change the selected/unselected foreground/background color.
+        
+        Args:
+            sel_fore(str, optional): The selected foreground color.
+            sel_back(str, optional): The selected background color.
+            unsel_fore(str, optional): The unselected foreground color.
+            unsel_back(str, optional): The unselected background color.
+        """
         if sel_fore is not None:
             self.sel_fore = sel_fore
         if sel_back is not None:
@@ -153,12 +170,12 @@ class GUIElement:
         self.update()
     
     def clear(self, length=None):
-        """Overwrite this elements position in the terminal with spaces.
+        """Clear the displayed text and coloring.
         
-        After the text is overwritten with spaces, this object's
-        `cleanup` method is called. The `cleanup` method should be
-        overwritten to write over anything associated with this gui
-        element that would otherwise not be overwritten.
+        After the text is cleared, this element's `cleanup` method is
+        called. The `cleanup` method should be overwritten to write over
+        anything associated with this gui element that would otherwise
+        not be overwritten.
         
         Args:
             length(int, optional): If passed, this many columns will be
@@ -171,7 +188,9 @@ class GUIElement:
         self.cleanup()
     
     def cleanup(self):
-        """This method should be overwritten to write over anything
+        """Do additional cleanup as set by the user.
+        
+        This method should be overwritten to write over anything
         associated with this gui element that would otherwise not be
         overwritten.
         """
@@ -200,10 +219,23 @@ class GUICounter(GUIElement):
         else:
             raise ValueError("`GUICounter.align` must be either 'left' or 'right'")
     
-    def clear(self, width=0):
-        super().clear(max((width, len(str(self.text)), self.padding)))
+    def clear(self, length=0):
+        """Clear the displayed text and coloring.
+        
+        After the text is cleared, this element's `cleanup` method is
+        called. The `cleanup` method should be overwritten to write over
+        anything associated with this element that would otherwise not
+        be overwritten.
+        
+        Args:
+            length(int, optional): If passed, this many columns will be
+            overwritten if it is larger than the length of current text,
+            otherwise the the length of the current text willl be
+            overwritten."""
+        super().clear(max((length, len(str(self.text)), self.padding)))
     
     def increase(self):
+        """Increase the counter."""
         if not self.count == self.bounds[1]:
             self.count += 1
         elif self.wrap_bounds:
@@ -211,6 +243,7 @@ class GUICounter(GUIElement):
         self.update()
     
     def decrease(self):
+        """Decrease the counter."""
         if not self.count == self.bounds[0]:
             self.count -= 1
         elif self.wrap_bounds:
@@ -218,6 +251,7 @@ class GUICounter(GUIElement):
         self.update()
     
     def aux_increase(self):
+        """Increase the auxiliary counter."""
         if not self.count == self.aux_bounds[1]:
             self.aux_count += 1
         elif self.wrap_bounds:
@@ -225,6 +259,7 @@ class GUICounter(GUIElement):
         self.update()
     
     def aux_decrease(self):
+        """Decrease the auxiliary counter."""
         if not self.count == self.aux_bounds[0]:
             self.aux_count -= 1
         elif self.wrap_bounds:
@@ -246,15 +281,23 @@ class GUIHiddenList(GUICounter):
     
     @property
     def current(self):
+        """The currently displayed item."""
         return self.items[self.count % len(self.items)]
     
     def update(self):
+        """Update the displayed text to the currently selected item."""
         GUIElement.update(self, self.current)
     
     def clear(self):
+        """Clear the displayed text and coloring."""
         super().clear(self.max_width)
     
     def increase(self):
+        """Increase the current item index then update the text.
+        
+        If the index is already at the last item and wrap isn't on,
+        don't increase the index, otherwise do.
+        """
         if self.count == len(self.items) - 1:
             if self.wrap:
                 self.count += 1
@@ -263,6 +306,11 @@ class GUIHiddenList(GUICounter):
         self.update()
     
     def decrease(self):
+        """Decrease the current item index then update the text.
+        
+        If the index is already at the first item and wrap isn't on,
+        don't decrease the index, otherwise do.
+        """
         if self.count == 0:
             if self.wrap:
                 self.count -= 1
@@ -271,7 +319,7 @@ class GUIHiddenList(GUICounter):
         self.update()
 
 
-class ElementList(list):
+class Layout(list):
     def __init__(self, *args, default=0, wrap=True, exclusive=False):
         if not isinstance(args[0], GUIElement):
             args = args[0]
@@ -283,7 +331,7 @@ class ElementList(list):
                 element.exclusive_to = args
     
     def __repr__(self):
-        return 'ElementList(current={current!r}, wrap={wrap!r}, [{items}])'.format(
+        return 'Layout(current={current!r}, wrap={wrap!r}, [{items}])'.format(
             current=self.current, wrap=self.wrap, items=', '.join([repr(element) for element in self]))
     
     def __enter__(self):
@@ -294,6 +342,10 @@ class ElementList(list):
     
     @property
     def current(self):
+        """The currently selected item.
+        
+        When set, the element it is set to will become selected.
+        """
         return self[self._current_index]
     
     @current.setter
@@ -302,27 +354,47 @@ class ElementList(list):
         element.select()
     
     def init(self):
+        """Draw any gui prerequisites on the screen. User defined.
+        
+        This method is called before the `Layout.key_presses()`
+        loop runs.
+        """
         pass
     
     def cleanup(self):
+        """Do additional cleanup as set by the user.
+        
+        This method should be overwritten to write over anything
+        associated with the gui elements that would otherwise not be
+        overwritten.
+        """
         pass
     
     def clear_all(self):
+        """Clear every element.
+        
+        After every element is cleared (user defined `element.cleanup`
+        is called on every element after clearing it), the
+        `Layout.cleanup` method is called.
+        """
         for element in self:
             element.clear()
         self.cleanup()
     
     def deselect_all(self):
+        """Deselect every element."""
         for element in self:
             if element.selected:
                 element.deselect()
     
     def move_left(self):
+        """Select the item to the left of the current item."""
         self._current_index = (self._current_index - 1) % len(self)
         current = self.current
         current.select()
     
     def move_right(self):
+        """Select the item to the left of the current item."""
         self._current_index = (self._current_index + 1) % len(self)
         current = self.current
         current.select()
