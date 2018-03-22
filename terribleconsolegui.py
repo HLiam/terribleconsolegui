@@ -102,10 +102,10 @@ class GUIElement:
         unsel_back(str): The color of the background when unselected.
         selected(bool): Whether or not this element is selected.
         exclusive_to(list): A list of other gui elements that are
-            mutualy exclusive to this element. If this element is
+            mutually exclusive to this element. If this element is
             selected is selected, all the elements in this list will be
             deselected. If the list contains this element, it will be
-            skiped.
+            skipped.
     """
     
     def __init__(self, text, x, y, sel_fore=Fore.RESET, sel_back=Back.GREEN,
@@ -231,7 +231,7 @@ class GUICounter(GUIElement):
         Args:
             length(int, optional): If passed, this many columns will be
             overwritten if it is larger than the length of current text,
-            otherwise the the length of the current text willl be
+            otherwise the length of the current text will be
             overwritten."""
         super().clear(max((length, len(str(self.text)), self.padding)))
     
