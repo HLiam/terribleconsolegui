@@ -340,7 +340,8 @@ class Layout:
         self.elements = list(args)
         self.wrap = wrap
         self._current_index = starting_index
-        self.keys = keys if keys is not None else {}
+        self._keys = keys if keys is not None else {}
+        self.keys = self._keys
         # self.key = _keyDecorator(self)
         if exclusive:
             for element in self.elements:
@@ -372,6 +373,16 @@ class Layout:
     
     def __exit__(self, exc_type, exc_value, traceback):
         self.clear_all()
+    
+    @property
+    def keys(self):
+        return self._keys
+    
+    @keys.setter
+    def keys(self, keys):
+        if 'default' not in keys:
+            keys['default'] = bool
+        self._keys = keys
     
     @property
     def current(self):
@@ -446,7 +457,10 @@ class Layout:
                 key = _keys[key + getch()]
             else:
                 key = _keys[key]
-            key = self.keys.get(key, bool)
+            try:
+                key = self.keys[key]
+            except KeyError:
+                key = self.keys['default']
             try:
                 key.__call__()
             except AttributeError:
