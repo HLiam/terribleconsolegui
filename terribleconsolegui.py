@@ -1,15 +1,15 @@
 import colorama
 from math import inf
 from msvcrt import getch
+from functools import wraps
 from colorama import Fore, Back
 
 
 colorama.init()
-keys = {
+_keys = {
     b' ':        ' ',
     b'\x1c':     '^\\',
     b'\x1b':     'esc',
-    b'\x1d':     '^]',
     b'\r':       'enter',
     b'\n':       '^enter',
     b'\t':       'tab',
@@ -51,8 +51,8 @@ keys = {
     b'\xe0K':    'left',
     b'\xe0M':    'right',
 }
-keys.update({bytes((i,)): chr(i) for i in range(32, 127)})
-# keys.update({bytes((i,)): f'^{chr(i + 65)}' for i in range(0, 26)})  # ctrl+char
+_keys.update({bytes((i,)): chr(i) for i in range(32, 127)})
+# _keys.update({bytes((i,)): f'^{chr(i + 65)}' for i in range(0, 26)})  # ctrl+char
 
 
 def print_pos(text: str, x: int, y: int, fore=Fore.RESET, back=Back.RESET):
@@ -182,6 +182,7 @@ class GUIElement:
             overwritten. Defaults to the length of this objects `text`
             attribute.
         """
+        self.deselect()
         if length is None:
             length = len(str(self.text))
         print_pos(' ' * length, self.x, self.y, Fore.RESET, Back.RESET)
@@ -319,20 +320,52 @@ class GUIHiddenList(GUICounter):
         self.update()
 
 
-class Layout(list):
-    def __init__(self, *args, default=0, wrap=True, exclusive=False):
+# class _keyDecorator:
+#     def __init__(self, layout):
+#         self.layout = layout
+    
+#     def __call__(self, key):
+#         def decorator(func):
+#             @wraps(func)
+#             def wrapped(*args, **kwargs):
+#                 return func(*args, **kwargs)
+#             return wrapped
+#         return decorator
+
+
+class Layout:
+    def __init__(self, *args, starting_index=0, wrap=True, exclusive=False, keys=None):
         if not isinstance(args[0], GUIElement):
             args = args[0]
-        super().__init__(args)
+        self.elements = list(args)
         self.wrap = wrap
-        self._current_index = default
+        self._current_index = starting_index
+        self.keys = keys if keys is not None else {}
+        # self.key = _keyDecorator(self)
         if exclusive:
-            for element in args:
+            for element in self.elements:
                 element.exclusive_to = args
     
     def __repr__(self):
-        return 'Layout(current={current!r}, wrap={wrap!r}, [{items}])'.format(
-            current=self.current, wrap=self.wrap, items=', '.join([repr(element) for element in self]))
+        return 'Layout(current={current!r}, wrap={wrap!r}, [{elements}])'.format(
+            current=self.current, wrap=self.wrap, elements=', '.join([repr(elements) for elements in self.elements]))
+    
+    def __len__(self):
+        return len(self.elements)
+    
+    def __iter__(self):
+        return iter(self.elements)
+    
+    def __getitem__(self, index):
+        return self.elements[index]
+    
+    def __setitem__(self, index, value):
+        self.elements[index] = value
+        self.elements[index].update()
+    
+    def __delitem__(self, index):
+        self.elements[index].clear()
+        del self.elements[index]
     
     def __enter__(self):
         return self
@@ -344,13 +377,13 @@ class Layout(list):
     def current(self):
         """The currently selected item.
         
-        When set, the element it is set to will become selected.
+        When set, the element it's set to will become selected.
         """
-        return self[self._current_index]
+        return self.elements[self._current_index]
     
     @current.setter
     def current(self, element):
-        self._current_index = self.index(element)
+        self._current_index = self.elements.index(element)
         element.select()
     
     def init(self):
@@ -377,55 +410,48 @@ class Layout(list):
         is called on every element after clearing it), the
         `Layout.cleanup` method is called.
         """
-        for element in self:
+        for element in self.elements:
             element.clear()
         self.cleanup()
     
     def deselect_all(self):
         """Deselect every element."""
-        for element in self:
+        for element in self.elements:
             if element.selected:
                 element.deselect()
     
-    def move_left(self):
-        """Select the item to the left of the current item."""
-        self._current_index = (self._current_index - 1) % len(self)
-        current = self.current
-        current.select()
+    def result(self):
+        return self.current
     
-    def move_right(self):
+    def previous(self):
         """Select the item to the left of the current item."""
-        self._current_index = (self._current_index + 1) % len(self)
-        current = self.current
-        current.select()
+        self._current_index = (self._current_index - 1) % len(self.elements)
+        self.current.select()
     
-    def key_presses(self, auto_left_right=False, auto_up_down=False, auto_esc=False, auto_enter=False, clean=False):
+    def next(self):
+        """Select the item to the left of the current item."""
+        self._current_index = (self._current_index + 1) % len(self.elements)
+        self.current.select()
+    
+    def run_loop(self, clear_on_exit=False):
         self.init()
         self.current.select()
-        for element in self:
+        for element in self.elements:
             element.update()
         while True:
             key = getch()
             if key == b'\x00':
-                key = keys[key + getch()]
+                key = _keys[key + getch()]
             elif key == b'\xe0':
-                key = keys[key + getch()]
+                key = _keys[key + getch()]
             else:
-                key = keys[key]
-            if auto_left_right:
-                if key in ('left', 'a'):
-                    self.move_left()
-                elif key in ('right', 'd'):
-                    self.move_right()
-            if auto_up_down:
-                if key in ('up', 'w'):
-                    self.current.increase()
-                elif key in ('down', 's'):
-                    self.current.decrease()
-            if auto_esc and key == 'esc':
-                exit()
-            if auto_enter and key == 'enter':
-                break
-            yield key
-        if clean:
-            self.clear_all()
+                key = _keys[key]
+            key = self.keys.get(key, bool)
+            try:
+                key.__call__()
+            except AttributeError:
+                if key is None:
+                    if clear_on_exit:
+                        self.clear_all()
+                    return self.result()
+                raise
