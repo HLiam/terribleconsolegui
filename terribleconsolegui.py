@@ -458,13 +458,15 @@ class Layout:
             else:
                 key = _keys[key]
             try:
-                key = self.keys[key]
+                key_mapped_func = self._keys[key]
             except KeyError:
-                key = self.keys['default']
+                key_default_func = self._keys['default']
+                key_default_func.__call__(key)
+                return
             try:
-                key.__call__()
+                key_mapped_func.__call__()
             except AttributeError:
-                if key is None:
+                if key_mapped_func is None:
                     if clear_on_exit:
                         self.clear_all()
                     return self.result()
