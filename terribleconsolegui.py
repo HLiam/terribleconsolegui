@@ -1,8 +1,10 @@
 import colorama
 from math import inf
-from msvcrt import getch
-from functools import wraps
 from colorama import Fore, Back
+try:
+    from msvcrt import getch
+except ImportError:
+    print('Only works on windows')
 
 
 colorama.init()
