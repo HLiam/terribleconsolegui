@@ -56,7 +56,7 @@ class TimeSelection(Layout):
         print_pos('        ', 2, self.line)
     
     def pop_section(self):
-        self.clear_all()
+        self.clear()
         raise PopGUISection()
 
 
