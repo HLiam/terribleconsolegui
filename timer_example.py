@@ -1,8 +1,6 @@
 import colorama
-from time import time, sleep
-from contextlib import suppress
 
-from terribleconsolegui import Layout, GUIElement, GUICounter, print_pos, PopGUISection
+from terribleconsolegui import Layout, GUIElement, GUICounter, print_pos
 
 
 colorama.init()
@@ -18,9 +16,10 @@ class TypeSelection(Layout):
             'right': self.next,
             'a':     self.previous,
             'd':     self.next,
-            'esc':   exit,
-            'enter': None,
         }
+    
+    def result(self):
+        return self.text
 
 
 class TimeSelection(Layout):
@@ -29,7 +28,7 @@ class TimeSelection(Layout):
         super().__init__(GUICounter(3, self.line, align='right', padding=2, bounds=(0, 23)),
                          GUICounter(6, self.line, align='right', padding=2, bounds=(0, 59)),
                          GUICounter(9, self.line, align='right', padding=2, bounds=(0, 59)),
-                         starting_index=2, exclusive=True)
+                         starting_index=2, exclusive=True, deselect_on_exit=True)
         self.keys = {
             'left':  self.previous,
             'right': self.next,
@@ -39,9 +38,6 @@ class TimeSelection(Layout):
             'down':  lambda: self.current.decrease(),
             'w':     lambda: self.current.increase(),
             's':     lambda: self.current.decrease(),
-            'esc':   exit,
-            'back':  self.pop_section,
-            'enter': None,
         }
     
     def init(self):
@@ -49,23 +45,20 @@ class TimeSelection(Layout):
         print_pos('  :  :  ', 3, self.line)
     
     def result(self):
-        self.deselect_all()
         return self[2].count + self[1].count * 60 + self[0].count * 60 ** 2
     
     def cleanup(self):
         print_pos('        ', 2, self.line)
-    
-    def pop_section(self):
-        self.clear()
-        raise PopGUISection()
+
+
+class NavigationLayout(Layout):
+    def __init__(self):
+        super().__init__(TypeSelection(line=2),
+                         TimeSelection(line=4))
 
 
 def main():
-    while True:
-        type_ = TypeSelection(line=2).run_loop().text
-        with suppress(PopGUISection):
-            total = TimeSelection(line=4).run_loop()
-            break
+    total, type_ = NavigationLayout().start()
     print_pos(f'Thats {total} seconds, with a {type_}', 1, 6)
     # Implementing the actual timer is left as an exercise for the reader (or until I feel like doing it).
 
