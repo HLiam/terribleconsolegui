@@ -67,8 +67,12 @@ _keys.update({bytes((i,)): chr(i) for i in range(32, 127)})
 #         return decorator
 
 
+class _StopKeypressLoop(Exception):
+    pass
+
+
 class Layout:
-    def __init__(self, *args, starting_index=0, wrap=True, exclusive=False, keys=None, clear_on_exit=False):
+    def __init__(self, *args, starting_index=0, wrap=True, exclusive=False, keys=None):
         if not isinstance(args[0], GUIElement):
             args = args[0]
         self.elements = list(args)
@@ -76,7 +80,7 @@ class Layout:
         self._current_index = starting_index
         self._keys = keys if keys is not None else {}
         self.keys = self._keys
-        self.clear_on_exit = clear_on_exit
+        self._running = False
         # self.key = _keyDecorator(self)
         if exclusive:
             for element in self.elements:
@@ -166,43 +170,53 @@ class Layout:
             if element.selected:
                 element.deselect()
     
+    def exit(self):
+        pass
+    
     def result(self):
         return self.current
     
     def previous(self):
         """Select the item to the left of the current item."""
         self._current_index = (self._current_index - 1) % len(self.elements)
-        self.current.select()
     
     def next(self):
         """Select the item to the left of the current item."""
         self._current_index = (self._current_index + 1) % len(self.elements)
-        self.current.select()
+        current = self.current
+        if isinstance(current, Layout):
+            self.stop()
+            current.start()
+        else:
+            current.select()
     
-    def run_loop(self, clear_on_exit=False):
-        self.init()
-        self.current.select()
-        for element in self.elements:
-            element.update()
-        while True:
-            key = getch()
-            if key == b'\x00':
-                key = _keys[key + getch()]
-            elif key == b'\xe0':
-                key = _keys[key + getch()]
-            else:
-                key = _keys[key]
-            try:
-                key_mapped_func = self._keys[key]
-            except KeyError:
-                key_default_func = self._keys['default']
-                key_default_func.__call__(key)
-                continue
-            try:
-                key_mapped_func.__call__()
-            except AttributeError:
-                if key_mapped_func is None:
-                    if clear_on_exit or self.clear_on_exit:
-                        self.clear()
-                    return self.result()
-                raise
+    def stop(self):
+        raise _StopKeypressLoop
+    
+    def start(self):
+        try:
+            self.running = True
+            self.init()
+            self.current.select()
+            for element in self.elements:
+                element.update()
+            while True:
+                key = getch()
+                if key == b'\x00' or key == b'\xe0':
+                    key += getch()
+                key_friendly = _keys[key]
+                try:
+                    mapped_func = self._keys[key_friendly]
+                    try:
+                        mapped_func.__call__()
+                    except AttributeError:
+                        if mapped_func is None:
+                            self.exit()
+                            self.running = False
+                            return self.result()
+                        raise
+                except KeyError:
+                    self._keys['default'].__call__(key_friendly)
+        except _StopKeypressLoop:
+            self._running = False
+            self.exit()

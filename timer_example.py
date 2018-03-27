@@ -55,6 +55,11 @@ class NavigationLayout(Layout):
     def __init__(self):
         super().__init__(TypeSelection(line=2),
                          TimeSelection(line=4))
+    
+    def previous(self):
+        if self.current is self[1]:
+            self.current.clear()
+            super().previous()
 
 
 def main():
