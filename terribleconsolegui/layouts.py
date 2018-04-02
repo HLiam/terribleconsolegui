@@ -201,12 +201,9 @@ class Layout:
             for element in self.elements:
                 element.update()
             while True:
-                key = getch()
-                if key == b'\x00' or key == b'\xe0':
-                    key += getch()
-                key_friendly = _keys[key]
+                key = listen_for_key()
                 try:
-                    mapped_func = self._keys[key_friendly]
+                    mapped_func = self._keys[key]
                     try:
                         mapped_func.__call__()
                     except AttributeError:
@@ -216,7 +213,14 @@ class Layout:
                             return self.result()
                         raise
                 except KeyError:
-                    self._keys['default'].__call__(key_friendly)
+                    self._keys['default'].__call__(key)
         except _StopKeypressLoop:
             self._running = False
             self.exit()
+
+
+def listen_for_key():
+    key = getch()
+    if key == b'\x00' or key == b'\xe0':
+        key += getch()
+    return _keys[key]
