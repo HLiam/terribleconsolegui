@@ -7,10 +7,7 @@ from .common import print_pos
 class PopGUISection(Exception):
     """This exception should be raised when closing and cleaning up a
     gui section.
-    
-    TODO: This was a temporary solution. Get rid of it and make a stack
-        of layouts that manages everything on its own. It's gunna be so
-        fancy."""
+    """
     pass
 
 
@@ -50,6 +47,11 @@ class GUIElement:
             selected is selected, all the elements in this list will be
             deselected. If the list contains this element, it will be
             skipped.
+    
+    TODO:
+        Rewrite to remove selectability, then add a new `GUISelectable`
+            that contains two `GUIElement`s, one called `selected` and
+            the other called `unselected`.
     """
     
     def __init__(self, text, x, y, sel_fore=Fore.RESET, sel_back=Back.GREEN,

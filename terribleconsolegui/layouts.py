@@ -66,19 +66,6 @@ _keys.update({bytes((i,)): chr(i) for i in range(32, 127)})
 # _keys.update({bytes((i,)): f'^{chr(i + 65)}' for i in range(0, 26)})  # ctrl+char
 
 
-# class _keyDecorator:
-#     def __init__(self, layout):
-#         self.layout = layout
-    
-#     def __call__(self, key):
-#         def decorator(func):
-#             @wraps(func)
-#             def wrapped(*args, **kwargs):
-#                 return func(*args, **kwargs)
-#             return wrapped
-#         return decorator
-
-
 class _StopKeypressLoop(Exception):
     pass
 
@@ -90,10 +77,8 @@ class Layout:
         self.elements = list(args)
         self.wrap = wrap
         self._current_index = starting_index
-        self._keys = keys if keys is not None else {}
-        self.keys = self._keys
+        self.keys = keys if keys is not None else {}
         self._running = False
-        # self.key = _keyDecorator(self)
         if exclusive:
             for element in self.elements:
                 element.exclusive_to = args
@@ -126,20 +111,11 @@ class Layout:
         self.clear()
     
     @property
-    def keys(self):
-        return self._keys
-    
-    @keys.setter
-    def keys(self, keys):
-        if 'default' not in keys:
-            keys['default'] = bool
-        self._keys = keys
-    
-    @property
     def current(self):
-        """The currently selected item.
+        """The currently selected element.
         
-        When set, the element it's set to will become selected.
+        When set, the element it-
+        +'s set to will become selected.
         """
         return self.elements[self._current_index]
     
@@ -151,7 +127,7 @@ class Layout:
     def init(self):
         """Draw any gui prerequisites on the screen. User defined.
         
-        This method is called before the `Layout.key_presses()`
+        This method is called before the `Layout.start()`
         loop runs.
         """
         pass
@@ -182,8 +158,9 @@ class Layout:
             if element.selected:
                 element.deselect()
     
-    def exit(self):
-        pass
+    def exit(self, clear=False):
+        if clear:
+            self.clear()
     
     def result(self):
         return self.current
@@ -203,35 +180,32 @@ class Layout:
             current.select()
     
     def stop(self):
+        """Stop listening for keypresses."""
         raise _StopKeypressLoop
     
     def start(self):
         try:
-            self.running = True
             self.init()
             self.current.select()
             for element in self.elements:
                 element.update()
             while True:
                 key = listen_for_key()
+                # if key == '^c': exit()
                 try:
-                    mapped_func = self._keys[key]
-                    try:
-                        mapped_func.__call__()
-                    except AttributeError:
-                        if mapped_func is None:
-                            self.exit()
-                            self.running = False
-                            return self.result()
-                        raise
+                    mapped_func = self.keys[key]
+                    mapped_func.__call__()
                 except KeyError:
-                    self._keys['default'].__call__(key)
+                    try:
+                        self.keys['default'].__call__(key)
+                    except KeyError:
+                        pass
         except _StopKeypressLoop:
-            self._running = False
             self.exit()
 
 
 def listen_for_key():
+    """Return the friendly name of the next pressed key (blocking)."""
     key = getch()
     if key == b'\x00' or key == b'\xe0':
         key += getch()

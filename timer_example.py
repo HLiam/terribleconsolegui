@@ -1,4 +1,6 @@
 import colorama
+from io import StringIO
+from contextlib import redirect_stderr
 
 from terribleconsolegui import Layout, GUIElement, GUICounter, print_pos
 
@@ -28,7 +30,7 @@ class TimeSelection(Layout):
         super().__init__(GUICounter(3, self.line, align='right', padding=2, bounds=(0, 23)),
                          GUICounter(6, self.line, align='right', padding=2, bounds=(0, 59)),
                          GUICounter(9, self.line, align='right', padding=2, bounds=(0, 59)),
-                         starting_index=2, exclusive=True, deselect_on_exit=True)
+                         starting_index=2, exclusive=True)
         self.keys = {
             'left':  self.previous,
             'right': self.next,
@@ -55,6 +57,11 @@ class NavigationLayout(Layout):
     def __init__(self):
         super().__init__(TypeSelection(line=2),
                          TimeSelection(line=4))
+        self.keys = {
+            'esc':   exit,
+            'enter': self.next,
+            'back':  self.previous,
+        }
     
     def previous(self):
         if self.current is self[1]:
@@ -69,5 +76,11 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    err = StringIO()
+    with redirect_stderr(err):
+        try:
+            main()
+        except:
+            err.seek(0)
+            print('\n' * 60 + err.read())
     input()
