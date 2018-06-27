@@ -56,12 +56,12 @@ class TimeSelection(Layout):
 class NavigationLayout(Layout):
     def __init__(self):
         super().__init__(TypeSelection(line=2),
-                         TimeSelection(line=4))
-        self.keys = {
-            'esc':   exit,
-            'enter': self.next,
-            'back':  self.previous,
-        }
+                         TimeSelection(line=4),
+                         callbacks = {
+                             'esc':   exit,
+                             'enter': self.next,
+                             'back':  self.previous
+                         })
     
     def previous(self):
         if self.current is self[1]:
@@ -72,7 +72,7 @@ class NavigationLayout(Layout):
 def main():
     total, type_ = NavigationLayout().start()
     print_pos(f'Thats {total} seconds, with a {type_}', 1, 6)
-    # Implementing the actual timer is left as an exercise for the reader (or until I feel like doing it).
+    # TODO: Flush stuff out then make come fancy clocks.
 
 
 if __name__ == '__main__':

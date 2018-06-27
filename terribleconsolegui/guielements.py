@@ -1,14 +1,7 @@
 from math import inf
 from colorama import Fore, Back
 
-from .common import print_pos
-
-
-class PopGUISection(Exception):
-    """This exception should be raised when closing and cleaning up a
-    gui section.
-    """
-    pass
+from common import print_pos
 
 
 class GUIElement:
@@ -18,120 +11,56 @@ class GUIElement:
         text(str): The text to display.
         x(int): The x (col) of the terminal to display at.
         y(int): The y (row) of the terminal to display at.
-        sel_fore(str, optional): The color of the foreground when
-            selected. Should be an ANSI color code. Defaults to
-            `Fore.RESET`.
-        sel_back(str, optional): The color of the background when
-            selected. Should be an ANSI color code. Defaults to
-            `Back.GREEN`.
-        unsel_fore(str, optional): The color of the foreground when
-            unselected. Should be an ANSI color code. Defaults to
-            `Fore.RESET`.
-        unsel_back(str, optional): The color of the background when
-            unselected. Should be an ANSI color code. Defaults to
-            `Back.RESET`.
-        selected(bool, optional): Whether or not this element should be
-            selected by default. Defaults to False.
+        has_focus(bool, optional): Whether or not this element should
+            have foucs by default. Defaults to False.
     
     Attributes:
-        text(str): The text to display.
         x(int): The x (col) of the terminal to display at.
         y(int): The y (row) of the terminal to display at.
-        sel_fore(str): The color of the foreground when selected.
-        sel_back(str): The color of the background when selected.
-        unsel_fore(str): The color of the foreground when unselected.
-        unsel_back(str): The color of the background when unselected.
-        selected(bool): Whether or not this element is selected.
+        has_focus(bool): Whether or not this element should have focus.
         exclusive_to(list): A list of other gui elements that are
             mutually exclusive to this element. If this element is
             selected is selected, all the elements in this list will be
             deselected. If the list contains this element, it will be
             skipped.
-    
-    TODO:
-        Rewrite to remove selectability, then add a new `GUISelectable`
-            that contains two `GUIElement`s, one called `selected` and
-            the other called `unselected`.
+        TODO:
+            Separate the fouc stuff into a different element so that
+            the focused GUIElement doesn't have it's own focus stuff.
     """
     
-    def __init__(self, text, x, y, sel_fore=Fore.RESET, sel_back=Back.GREEN,
-                 unsel_fore=Fore.RESET, unsel_back=Back.RESET, selected=False):
-        self.text = text
+    def __init__(self, x: int, y: int, fore=Fore.RESET, back=Back.RESET):
         self.x = x
         self.y = y
-        self.selected = selected
-        self.sel_fore = sel_fore
-        self.sel_back = sel_back
-        self.unsel_fore = unsel_fore
-        self.unsel_back = unsel_back
-        self.exclusive_to = []
+        self.fore = fore
+        self.back = back
     
-    def set_color(self, sel_fore=None, sel_back=None, unsel_fore=None, unsel_back=None):
+    def set_color(self, fore=None, back=None):
         """Change the selected/unselected foreground/background color.
         
         Args:
-            sel_fore(str, optional): The selected foreground color.
-            sel_back(str, optional): The selected background color.
-            unsel_fore(str, optional): The unselected foreground color.
-            unsel_back(str, optional): The unselected background color.
+            fore(str, optional): The foreground color.
+            back(str, optional): The background color.
         """
-        if sel_fore is not None:
-            self.sel_fore = sel_fore
-        if sel_back is not None:
-            self.sel_back = sel_back
-        if unsel_fore is not None:
-            self.unsel_fore = unsel_fore
-        if unsel_back is not None:
-            self.unsel_back = unsel_back
+        if fore is not None:
+            self.fore = fore
+        if back is not None:
+            self.back = back
         self.update()
     
-    def update(self, text: str=None):
-        """Update the text and color of the gui element.
-        
-        Args:
-            text(str, optional): If passed, set the text to this before
-                updating.
+    def update(self):
+        """Update the element. This method should be overridden in
+        children.
         """
-        if text is None:
-            text = self.text
-        fore = self.sel_fore if self.selected else self.unsel_fore
-        back = self.sel_back if self.selected else self.unsel_back
-        print_pos(text, self.x, self.y, fore, back)
+        pass
     
-    def select(self):
-        """Select this gui element.
-        
-        Change the colors to the selected colors. Any gui elements in
-        this objects `exclusive_to` attribute will be deselected.
-        """
-        for element in self.exclusive_to:
-            if element.selected and element is not self:
-                element.deselect()
-        self.selected = True
-        self.update()
-    
-    def deselect(self):
-        """Deselected this element."""
-        self.selected = False
-        self.update()
-    
-    def clear(self, length=None):
+    def clear(self):
         """Clear the displayed text and coloring.
         
         After the text is cleared, this element's `cleanup` method is
         called. The `cleanup` method should be overwritten to write over
         anything associated with this gui element that would otherwise
         not be overwritten.
-        
-        Args:
-            length(int, optional): If passed, this many columns will be
-            overwritten. Defaults to the length of this objects `text`
-            attribute.
         """
-        self.deselect()
-        if length is None:
-            length = len(str(self.text))
-        print_pos(' ' * length, self.x, self.y, Fore.RESET, Back.RESET)
         self.cleanup()
     
     def cleanup(self):
@@ -144,12 +73,92 @@ class GUIElement:
         pass
 
 
-class GUICounter(GUIElement):
-    def __init__(self, x, y, sel_fore=Fore.RESET, sel_back=Back.GREEN,
-                 unsel_fore=Fore.RESET, unsel_back=Back.RESET,
-                 selected=False, default=0, default_aux=0, align='left', padding=0,
-                 bounds=(-inf, inf), aux_bounds=(-inf, inf), wrap_bounds=True):
-        super().__init__(default, x, y, Fore.RESET, Back.GREEN, Fore.RESET, Back.RESET)
+class GUIFocusable(GUIElement):
+    def __init__(self, x: int, y: int, fore=Fore.RESET, back=Back.RESET,
+                 focused=None, has_focus: bool=False):
+        super().__init__(x, y, fore, back)
+        self.has_focus = has_focus
+        if focused is None:
+            self.focused = GUIElement(x, y)
+        elif isinstance(focused, dict):
+            self.focused = GUIElement(x, y)
+            self.focused.__dict__.update(focused)
+        # Attibutes that are overridden by this element gained focus
+        # will be stored here. When the element loses focus, the items
+        # in this dict will be copied to the element's __dict__.
+        self._unfocused_state = {}
+        self.exclusive_to = []  # TODO make sure this works
+    
+    def focus(self):
+        """Select this gui element.
+        
+        Change the colors to the selected colors. Any gui elements in
+        this objects `exclusive_to` attribute will be deselected.
+        """
+        for element in self.exclusive_to:
+            if element.selected and element is not self:
+                element.deselect()
+        for attr, value in self.focused.__dict__.items():
+            if attr in self.__dict__:
+                self._unfocused_state[attr] = self.__dict__[attr]
+                self.__dict__[attr] = value
+        self.has_focus = True
+        self.update()
+    
+    def defocus(self):
+        """Deselected this element."""
+        self.__dict__.update(self._unfocused_state)
+        self._unfocused_state = {}
+        self.has_focus = False
+        self.update()
+    
+    def cleanup(self):
+        super().cleanup()
+        self.defocus()
+
+
+class GUIElement2d(GUIFocusable):
+    def __init__(self, x: int, y: int, x2: int, y2: int,
+                 fore=Fore.RESET, Back=Back.RESET, focused=None,
+                 has_focus: bool=False):
+        super().__init__(self, x, y, fore, back, focused, has_focus)
+        self.x2 = x2
+        self.y2 = y2
+    
+    def update(self):
+        for col in range(self.y, self.y2):
+            print_pos(' ' * x2 - x1, self.x, col, self.fore, self.back)
+
+
+class GUITextElement(GUIFocusable):
+    def __init__(self, x: int, y: int, text='', fore=Fore.RESET, back=Back.RESET focused=None, has_focus=False):
+        super().__init__(x, y, fore, back, focused, has_focus)
+        self.text = text
+    
+    def update(self):
+        print_pos(self.text, self.x, self.y, self.fore, self.back)
+
+    def set_text(self, text, fore=None, back=None):
+        self.text = text
+        if fore is not None:
+            self.fore = fore
+        if back is not None:
+            self.back = back
+        self.update()
+    
+    def clear(self, length=None):
+        """"""
+        super().clear()
+        if length is None:
+            length = len(self.text)
+        print_pos(' ' * length, self.x, self.y)
+
+
+class GUICounter(GUITextElement):
+    def __init__(self, x, y, fore=Fore.RESET, back=Back.GREEN,
+                 focused=None, has_focus=False, default=0,
+                 align='left', padding=0, bounds=(-inf, inf), wrap_bounds=True):
+        super().__init__(x, y, default, fore, back)
         self.count = default
         self.aux_count = default_aux
         self.align = align
@@ -160,13 +169,13 @@ class GUICounter(GUIElement):
     
     def update(self):
         if self.align == 'left':
-            super().update(f'{self.count}')
+            self.set_text(self.count)
         elif self.align == 'right':
-            super().update(str(self.count).zfill(self.padding))
+            self.set_text(str(self.count).zfill(self.padding))
         else:
             raise ValueError("`GUICounter.align` must be either 'left' or 'right'")
     
-    def clear(self, length=0):
+    def clear(self, length: int=0):
         """Clear the displayed text and coloring.
         
         After the text is cleared, this element's `cleanup` method is
