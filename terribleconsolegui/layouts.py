@@ -1,9 +1,9 @@
-from guielements import GUIElement
-from keyloop import callbacks, CallbackNode
+from .guielements import GUIElement
+from .keyloop import callbacks, CallbackNode
 from contextlib import suppress
 
 
-class Layout:
+class GUILayout:
     def __init__(self, *args: GUIElement, starting_index: int=0, wrap: bool=True,
                  exclusive: bool=False):
         if not isinstance(args[0], GUIElement):
@@ -45,10 +45,9 @@ class Layout:
 
     @property
     def current(self) -> GUIElement:
-        """The currently selected element.
+        """The currently focused element.
 
-        When set, the element it-
-        +'s set to will become selected.
+        When set, the element it's set to will become focused.
         """
         return self.elements[self._current_index]
 
@@ -60,8 +59,7 @@ class Layout:
     def init(self):
         """Draw any gui prerequisites on the screen. User defined.
 
-        This method is called before the `Layout.start()`
-        loop runs.
+        This method is called before the `Layout.start()` loop runs.
         """
         pass
 
@@ -106,10 +104,10 @@ class Layout:
 
     def bind_key(self, key: str, callback: object, auto_unbind: bool=False):
         """Bind `callback` funtion to `key`.
-        
+
         Only one funtion can be bound to key at a time (per layout
         object).
-        
+
         Args:
             key(str): The key to bind. The valid names are listed above.
                 (TODO)
@@ -117,6 +115,7 @@ class Layout:
                 called when the key is pressed.
             auto_unbind(bool, optional): Automatically unbind the key if
                 it's already bound. Defaults to False.
+
         Raises:
             KeyError: If the key is already bound and `auto_unbind` is
                 False.
@@ -125,7 +124,7 @@ class Layout:
         if auto_unbind:
             self.unbind_key(key)
         elif [cbnode for cbnode in list_for_key if cbnode.bound is self]:
-            raise KeyError(f'key {repr(key)} is invalid')
+            raise KeyError(f'key {key!r} is invalid')
         list_for_key.append(CallbackNode(self, callback))
 
     def unbind_key(self, key: str):
